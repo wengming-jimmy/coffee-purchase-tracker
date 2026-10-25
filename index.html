@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>咖啡店每日進貨紀錄</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;background:#f6f1e8;color:#2b2620}
+  header{background:#3e2c22;color:#fff;padding:18px 16px}
+  header h1{margin:0;font-size:22px}
+  header p{margin:6px 0 0;opacity:.85;font-size:14px}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .stores{display:flex;gap:8px}
+  .stores button{flex:1;padding:12px;border:2px solid #ddd;background:#fff;border-radius:10px;font-size:16px;cursor:pointer}
+  .stores button.active{background:#3e2c22;color:#fff;border-color:#3e2c22}
+  label{display:block;margin-top:12px;font-size:14px;color:#555}
+  input,select{width:100%;padding:12px;margin-top:6px;border:1px solid #ccc;border-radius:10px;font-size:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .amount{font-size:18px;font-weight:bold;margin-top:14px}
+  .primary{width:100%;margin-top:14px;padding:14px;border:0;border-radius:10px;background:#c08a3e;color:#fff;font-size:17px;font-weight:bold;cursor:pointer}
+  .secondary{padding:10px 12px;border:1px solid #ccc;background:#fff;border-radius:10px;font-size:14px;cursor:pointer}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+  .summary b{display:block;font-size:20px;margin-top:4px}
+  .item{border-top:1px solid #eee;padding:12px 0;display:flex;justify-content:space-between;gap:10px}
+  .item:first-of-type{border-top:0}
+  .item small{color:#777}
+  .del{border:0;background:none;color:#b00;font-size:14px;cursor:pointer;white-space:nowrap}
+  .note{font-size:13px;color:#777;line-height:1.6}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  @media(max-width:480px){.row{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.summary div:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header>
+  <h1>☕ 咖啡店每日進貨紀錄</h1>
+  <p>石牌店 / 士林店 · 手機、電腦都能用 · 月底匯出 CSV 給 POS 合併</p>
+</header>
+<main>
+  <div class="card">
+    <div class="stores" id="storeBtns">
+      <button type="button" data-store="石牌店" class="active">石牌店</button>
+      <button type="button" data-store="士林店">士林店</button>
+    </div>
+
+    <label>日期 <input type="date" id="date"></label>
+    <label>品名
+      <input id="name" list="items" placeholder="例如：咖啡豆" autocomplete="off">
+      <datalist id="items">
+        <option value="咖啡豆"><option value="鮮奶"><option value="燕麥奶"><option value="糖">
+        <option value="果糖"><option value="紙杯"><option value="杯蓋"><option value="吸管">
+        <option value="餐巾紙"><option value="茶葉"><option value="巧克力粉"><option value="抹茶粉">
+      </datalist>
+    </label>
+    <div class="row">
+      <label>數量 <input type="number" id="qty" min="0" step="any" inputmode="decimal" placeholder="例如：10"></label>
+      <label>單位（可不填） <input id="unit" placeholder="公斤 / 瓶 / 箱 / 包"></label>
+    </div>
+    <label>單價（元） <input type="number" id="price" min="0" step="any" inputmode="decimal" placeholder="例如：450"></label>
+    <div class="amount">金額：<span id="amount">0</span> 元</div>
+    <button class="primary" id="addBtn" type="button">＋ 新增這一筆</button>
+    <p class="note" id="msg"></p>
+  </div>
+
+  <div class="card">
+    <label>查看月份 <input type="month" id="month"></label>
+    <div class="actions">
+      <button class="secondary" id="exportStore" type="button">匯出目前分店本月 CSV</button>
+      <button class="secondary" id="exportAll" type="button">匯出兩店本月 CSV</button>
+    </div>
+    <div class="summary" style="margin-top:14px">
+      <div>本月筆數<b id="count">0</b></div>
+      <div>目前分店總金額<b id="totalStore">0 元</b></div>
+      <div>兩店合計<b id="totalAll">0 元</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 6px;font-size:18px">目前分店本月明細</h2>
+    <div id="list"><p class="note">還沒有資料，先新增一筆試試。</p></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 6px;font-size:18px">目前分店本月品名小計</h2>
+    <div id="subtotal"><p class="note">還沒有資料。</p></div>
+    <p class="note">CSV 欄位順序：日期,分店,品名,單位,數量,單價,金額。用 Excel 開啟時中文不會亂碼（已加 BOM）。匯出後請先備份，再拿去跟 POS 合併。</p>
+    <p class="note"><b>重要：</b>第一版資料只存在你現在這台裝置、這個瀏覽器裡，換手機或清除瀏覽資料會不見。正式給兩店共用前，建議升級成共用雲端表單（例如 Google 試算表），我可以再幫你接。</p>
+  </div>
+</main>
+<script>
+const KEY='coffeePurchases_v1';
+let store='石牌店';
+let data=[];
+try{ data=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ data=[]; }
+const $=id=>document.getElementById(id);
+function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+$('date').value=today(); $('month').value=thisMonth();
+function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+function fmt(n){ return Number(n).toLocaleString('zh-Hant'); }
+function calc(){ const q=parseFloat($('qty').value)||0, p=parseFloat($('price').value)||0; $('amount').textContent=fmt(Math.round(q*p*100)/100); }
+$('qty').addEventListener('input',calc); $('price').addEventListener('input',calc);
+document.querySelectorAll('#storeBtns button').forEach(b=>b.addEventListener('click',()=>{
+  store=b.dataset.store;
+  document.querySelectorAll('#storeBtns button').forEach(x=>x.classList.toggle('active',x===b));
+  render();
+}));
+$('addBtn').addEventListener('click',()=>{
+  const name=$('name').value.trim(), qty=parseFloat($('qty').value), price=parseFloat($('price').value);
+  if(!$('date').value||!name||!(qty>0)||!(price>=0)){ $('msg').textContent='請填完整：日期、品名、數量要大於 0、單價不能空白。'; return; }
+  data.unshift({date:$('date').value, store, name, unit:$('unit').value.trim(), qty, price, amount:Math.round(qty*price*100)/100, id:Date.now()});
+  save(); $('msg').textContent='已新增：'+store+' '+$('date').value+' '+name+'。';
+  $('name').value=''; $('qty').value=''; $('unit').value=''; $('price').value=''; calc(); render();
+});
+$('month').addEventListener('change',render);
+function filtered(allStores){
+  const m=$('month').value||thisMonth();
+  return data.filter(r=>r.date.startsWith(m)&&(allStores||r.store===store));
+}
+function render(){
+  const rows=filtered(false), all=filtered(true);
+  $('count').textContent=rows.length;
+  $('totalStore').textContent=fmt(rows.reduce((s,r)=>s+r.amount,0))+' 元';
+  $('totalAll').textContent=fmt(all.reduce((s,r)=>s+r.amount,0))+' 元';
+  $('list').innerHTML=rows.length? rows.map(r=>`<div class="item"><div><b>${r.name}</b> <small>${r.date} · ${r.qty}${r.unit||''} × ${fmt(r.price)} 元</small></div><div><b>${fmt(r.amount)} 元</b> <button class="del" data-id="${r.id}">刪除</button></div></div>`).join('') : '<p class="note">這個月、這間店還沒有資料。</p>';
+  document.querySelectorAll('.del').forEach(b=>b.addEventListener('click',()=>{
+    if(!confirm('確定刪除這一筆嗎？')) return;
+    data=data.filter(r=>String(r.id)!==b.dataset.id); save(); render();
+  }));
+  const map={};
+  rows.forEach(r=>{ const k=r.name; map[k]=map[k]||{qty:0,amount:0}; map[k].qty+=r.qty; map[k].amount+=r.amount; });
+  $('subtotal').innerHTML=Object.keys(map).length? Object.entries(map).map(([k,v])=>`<div class="item"><div>${k}</div><div>共 ${fmt(v.qty)} · ${fmt(v.amount)} 元</div></div>`).join('') : '<p class="note">還沒有資料。</p>';
+}
+function exportCSV(allStores){
+  const rows=filtered(allStores);
+  if(!rows.length){ alert('這個月沒有可匯出的資料。'); return; }
+  const esc=v=>`"${String(v).replaceAll('"','""')}"`;
+  const csv='\uFEFF'+['日期,分店,品名,單位,數量,單價,金額'].concat(rows.slice().reverse().map(r=>[r.date,r.store,r.name,r.unit,r.qty,r.price,r.amount].map(esc).join(','))).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`進貨_${$('month').value}_${allStores?'兩店':store}.csv`; a.click();
+}
+$('exportStore').addEventListener('click',()=>exportCSV(false));
+$('exportAll').addEventListener('click',()=>exportCSV(true));
+render();
+</script>
+</body>
+</html>
