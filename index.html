@@ -38,12 +38,12 @@
 <body>
 <header>
   <h1>☕ 咖啡店每日進貨紀錄</h1>
-  <p>石牌店 / 士林店 · 手機、電腦都能用 · 月底匯出 CSV 給 POS 合併</p>
+  <p>北投店 / 士林店 · 手機、電腦都能用 · 月底匯出 CSV 給 POS 合併</p>
 </header>
 <main>
   <div class="card">
     <div class="stores" id="storeBtns">
-      <button type="button" data-store="石牌店" class="active">石牌店</button>
+      <button type="button" data-store="北投店" class="active">北投店</button>
       <button type="button" data-store="士林店">士林店</button>
     </div>
 
@@ -90,7 +90,7 @@
       <label>分店
         <select id="adminStore">
           <option value="">全部</option>
-          <option value="石牌店">石牌店</option>
+          <option value="北投店">北投店</option>
           <option value="士林店">士林店</option>
         </select>
       </label>
@@ -118,7 +118,7 @@
 </main>
 <script>
 const KEY='coffeePurchases_v1';
-let store='石牌店';
+let store='北投店';
 let data=[];
 try{ data=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ data=[]; }
 const $=id=>document.getElementById(id);
@@ -126,6 +126,8 @@ function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMon
 function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 $('date').value=today(); $('month').value=thisMonth();
 function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+// 舊資料轉移：石牌店已改名為北投店，第一次開啟時自動轉換，之後就不再需要
+if(data.some(r=>r.store==='石牌店')){ data.forEach(r=>{ if(r.store==='石牌店') r.store='北投店'; }); save(); }
 function fmt(n){ return Number(n).toLocaleString('zh-Hant'); }
 function calc(){ const q=parseFloat($('qty').value)||0, p=parseFloat($('price').value)||0; $('amount').textContent=fmt(Math.round(q*p*100)/100); }
 $('qty').addEventListener('input',calc); $('price').addEventListener('input',calc);
