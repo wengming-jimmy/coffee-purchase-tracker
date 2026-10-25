@@ -29,6 +29,9 @@
   .del{border:0;background:none;color:#b00;font-size:14px;cursor:pointer;white-space:nowrap}
   .note{font-size:13px;color:#777;line-height:1.6}
   .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .danger{padding:10px 12px;border:1px solid #b00;background:#fff;color:#b00;border-radius:10px;font-size:14px;cursor:pointer}
+  .admin-check{width:auto;margin:0 8px 0 0;accent-color:#3e2c22}
+  .admin-item{align-items:center}
   @media(max-width:480px){.row{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.summary div:last-child{grid-column:1/-1}}
 </style>
 </head>
@@ -73,6 +76,31 @@
       <div>本月筆數<b id="count">0</b></div>
       <div>目前分店總金額<b id="totalStore">0 元</b></div>
       <div>兩店合計<b id="totalAll">0 元</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 style="margin:0;font-size:18px">後台管理</h2>
+      <button class="secondary" id="adminToggle" type="button">開啟後台</button>
+    </div>
+    <p class="note">用來找有問題的資料列，勾選後一次刪除。刪除前建議先匯出備份，刪掉就救不回來。</p>
+    <div id="adminPanel" style="display:none">
+      <label>搜尋品名或日期 <input id="adminSearch" placeholder="例如：咖啡豆 或 2026-10-26"></label>
+      <label>分店
+        <select id="adminStore">
+          <option value="">全部</option>
+          <option value="石牌店">石牌店</option>
+          <option value="士林店">士林店</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button class="secondary" id="adminSelectAll" type="button">全選目前列表</button>
+        <button class="secondary" id="adminExportAll" type="button">匯出全部備份 CSV</button>
+        <button class="danger" id="adminDelete" type="button">刪除選取的資料</button>
+      </div>
+      <p class="note" id="adminCount"></p>
+      <div id="adminList"></div>
     </div>
   </div>
 
@@ -131,7 +159,54 @@ function render(){
   const map={};
   rows.forEach(r=>{ const k=r.name; map[k]=map[k]||{qty:0,amount:0}; map[k].qty+=r.qty; map[k].amount+=r.amount; });
   $('subtotal').innerHTML=Object.keys(map).length? Object.entries(map).map(([k,v])=>`<div class="item"><div>${k}</div><div>共 ${fmt(v.qty)} · ${fmt(v.amount)} 元</div></div>`).join('') : '<p class="note">還沒有資料。</p>';
+  renderAdmin();
 }
+function adminRows(){
+  const q=($('adminSearch').value||'').trim();
+  const s=$('adminStore').value;
+  return data.filter(r=>(!s||r.store===s)&&(!q||r.name.includes(q)||r.date.includes(q)||r.store.includes(q)));
+}
+function updateAdminCount(){
+  const checked=document.querySelectorAll('.admin-check:checked').length;
+  $('adminCount').textContent=`目前列表 ${adminRows().length} 筆，已勾選 ${checked} 筆。`;
+}
+function renderAdmin(){
+  const rows=adminRows();
+  $('adminList').innerHTML=rows.length? rows.map(r=>`<div class="item admin-item"><input type="checkbox" class="admin-check" data-id="${r.id}"><div style="flex:1"><b>${r.name}</b> <small>${r.date} · ${r.store} · ${r.qty}${r.unit||''} × ${fmt(r.price)} 元</small></div><div><b>${fmt(r.amount)} 元</b> <button class="del admin-del" data-id="${r.id}">刪除</button></div></div>`).join('') : '<p class="note">沒有符合的資料。</p>';
+  document.querySelectorAll('.admin-check').forEach(c=>c.addEventListener('change',updateAdminCount));
+  document.querySelectorAll('.admin-del').forEach(b=>b.addEventListener('click',()=>{
+    if(!confirm('確定刪除這一筆嗎？刪除後無法復原。')) return;
+    data=data.filter(r=>String(r.id)!==b.dataset.id); save(); render();
+  }));
+  updateAdminCount();
+}
+$('adminToggle').addEventListener('click',()=>{
+  const open=$('adminPanel').style.display==='none';
+  $('adminPanel').style.display=open?'block':'none';
+  $('adminToggle').textContent=open?'關閉後台':'開啟後台';
+  if(open) renderAdmin();
+});
+$('adminSearch').addEventListener('input',renderAdmin);
+$('adminStore').addEventListener('change',renderAdmin);
+$('adminSelectAll').addEventListener('click',()=>{
+  const boxes=document.querySelectorAll('.admin-check');
+  const allChecked=boxes.length&&[...boxes].every(c=>c.checked);
+  boxes.forEach(c=>c.checked=!allChecked); updateAdminCount();
+});
+$('adminDelete').addEventListener('click',()=>{
+  const ids=[...document.querySelectorAll('.admin-check:checked')].map(c=>c.dataset.id);
+  if(!ids.length){ alert('請先勾選要刪除的資料列。'); return; }
+  if(!confirm(`確定刪除選取的 ${ids.length} 筆嗎？刪除後無法復原，建議先按「匯出全部備份 CSV」備份。`)) return;
+  data=data.filter(r=>!ids.includes(String(r.id))); save(); render();
+});
+$('adminExportAll').addEventListener('click',()=>{
+  if(!data.length){ alert('目前沒有可匯出的資料。'); return; }
+  const esc=v=>`"${String(v).replaceAll('"','""')}"`;
+  const csv='\uFEFF'+['日期,分店,品名,單位,數量,單價,金額'].concat(data.slice().reverse().map(r=>[r.date,r.store,r.name,r.unit,r.qty,r.price,r.amount].map(esc).join(','))).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='進貨_全部備份.csv'; a.click();
+});
 function exportCSV(allStores){
   const rows=filtered(allStores);
   if(!rows.length){ alert('這個月沒有可匯出的資料。'); return; }
